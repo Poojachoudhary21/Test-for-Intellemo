@@ -13,8 +13,8 @@ function App() {
   return (
     <>
      <Canvas />
-     <CanvasWithTextInput />
-     <VideoOnCanvas />
+     {/* <CanvasWithTextInput />
+     <VideoOnCanvas /> */}
      
     </>
   )
