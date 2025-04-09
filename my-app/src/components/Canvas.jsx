@@ -4,17 +4,10 @@ import useImage from 'use-image';
 import demoImage from '../assets/demo.jpeg';
 
 // Image Component
-const URLImage = ({ src, showTransformer, onTransformSave }) => {
+const URLImage = ({ src, showTransformer, onTransformSave, imageProps, setImageProps }) => {
   const [image] = useImage(src);
   const shapeRef = useRef();
   const trRef = useRef();
-  const [props, setProps] = useState({
-    x: 150,
-    y: 150,
-    width: 200,
-    height: 200,
-    rotation: 0,
-  });
 
   useEffect(() => {
     if (showTransformer && trRef.current && shapeRef.current) {
@@ -30,7 +23,7 @@ const URLImage = ({ src, showTransformer, onTransformSave }) => {
       <KonvaImage
         image={image}
         ref={shapeRef}
-        {...props}
+        {...imageProps}
         draggable
         onTransformEnd={() => {
           const node = shapeRef.current;
@@ -39,19 +32,19 @@ const URLImage = ({ src, showTransformer, onTransformSave }) => {
           node.scaleX(1);
           node.scaleY(1);
           const updatedProps = {
-            ...props,
+            ...imageProps,
             x: node.x(),
             y: node.y(),
             width: node.width() * scaleX,
             height: node.height() * scaleY,
             rotation: node.rotation(),
           };
-          setProps(updatedProps);
+          setImageProps(updatedProps);
           onTransformSave();
         }}
         onDragEnd={(e) => {
-          const updatedProps = { ...props, x: e.target.x(), y: e.target.y() };
-          setProps(updatedProps);
+          const updatedProps = { ...imageProps, x: e.target.x(), y: e.target.y() };
+          setImageProps(updatedProps);
           onTransformSave();
         }}
       />
@@ -107,7 +100,6 @@ const ResizableText = ({ text, showTransformer, textProps, setTextProps, onTrans
   );
 };
 
-// Combined Canvas Component
 const Canvas = () => {
   const videoRef = useRef(null);
   const konvaVideoRef = useRef(null);
@@ -117,12 +109,13 @@ const Canvas = () => {
   const [inputText, setInputText] = useState('');
   const [canvasText, setCanvasText] = useState('');
   const [textProps, setTextProps] = useState({ x: 100, y: 100, width: 200, fontSize: 20 });
+  const [imageProps, setImageProps] = useState({ x: 150, y: 150, width: 200, height: 200, rotation: 0 });
+  const [videoProps, setVideoProps] = useState({ x: 100, y: 300, width: 480, height: 270 });
   const [showTransformer, setShowTransformer] = useState(true);
 
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
-  // Video frame refresh
   useEffect(() => {
     const anim = () => {
       if (videoRef.current && !videoRef.current.paused && konvaVideoRef.current) {
@@ -130,15 +123,11 @@ const Canvas = () => {
         requestAnimationFrame(anim);
       }
     };
-
     if (isPlaying) {
       videoRef.current.play();
       anim();
     }
-
-    return () => {
-      videoRef.current?.pause();
-    };
+    return () => videoRef.current?.pause();
   }, [isPlaying]);
 
   const saveToHistory = () => {
@@ -146,7 +135,7 @@ const Canvas = () => {
   };
 
   const undo = () => {
-    if (history.length === 0) return;
+    if (!history.length) return;
     const last = history[history.length - 1];
     setRedoStack((prev) => [...prev, { textProps, canvasText }]);
     setTextProps(last.textProps);
@@ -155,7 +144,7 @@ const Canvas = () => {
   };
 
   const redo = () => {
-    if (redoStack.length === 0) return;
+    if (!redoStack.length) return;
     const next = redoStack[redoStack.length - 1];
     setHistory((prev) => [...prev, { textProps, canvasText }]);
     setTextProps(next.textProps);
@@ -169,22 +158,18 @@ const Canvas = () => {
     setCanvasText(inputText);
     setRedoStack([]);
   };
+
   const moveText = (dir) => {
     const offset = 10;
     saveToHistory();
     setRedoStack([]);
     setTextProps((prev) => {
       switch (dir) {
-        case 'up':
-          return { ...prev, y: prev.y - offset };
-        case 'down':
-          return { ...prev, y: prev.y + offset };
-        case 'left':
-          return { ...prev, x: prev.x - offset };
-        case 'right':
-          return { ...prev, x: prev.x + offset };
-        default:
-          return prev;
+        case 'up': return { ...prev, y: prev.y - offset };
+        case 'down': return { ...prev, y: prev.y + offset };
+        case 'left': return { ...prev, x: prev.x - offset };
+        case 'right': return { ...prev, x: prev.x + offset };
+        default: return prev;
       }
     });
   };
@@ -199,6 +184,26 @@ const Canvas = () => {
     }
   };
 
+  const handleSaveCanvas = () => {
+    const canvasState = { textProps, canvasText, imageProps, videoProps };
+    localStorage.setItem('canvasState', JSON.stringify(canvasState));
+    alert('Canvas saved!');
+  };
+
+  const handleLoadCanvas = () => {
+    const saved = localStorage.getItem('canvasState');
+    if (saved) {
+      const { textProps, canvasText, imageProps, videoProps } = JSON.parse(saved);
+      setTextProps(textProps);
+      setCanvasText(canvasText);
+      setImageProps(imageProps);
+      setVideoProps(videoProps);
+      alert('Canvas loaded!');
+    } else {
+      alert('No saved canvas found.');
+    }
+  };
+
   return (
     <div style={{ padding: '10px' }}>
       <input
@@ -208,25 +213,34 @@ const Canvas = () => {
         onChange={(e) => setInputText(e.target.value)}
         style={{ padding: '5px', borderRadius: '5px' }}
       />
-      <button onClick={handleAddText} style={{margin:'0 10px'}}>Add Text</button>
-      <button onClick={() => setShowTransformer((prev) => !prev)} style={{ margin: '0 10px' }}>
+      <button onClick={handleAddText} style={{ margin: '0 10px' }}>Add Text</button>
+      <button onClick={() => setShowTransformer((prev) => !prev)}>
         {showTransformer ? 'Hide Resize' : 'Show Resize'}
       </button>
       <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-        <button onClick={() => moveText('up')} style={{marginTop:'10px', marginRight:'10px'}}>⬆ Move Up</button>
-        <button onClick={() => moveText('down')} style={{marginTop:'10px', marginRight:'10px'}}>⬇ Move Down</button>
-        <button onClick={() => moveText('left')} style={{marginTop:'10px', marginRight:'10px'}}>⬅ Move Left</button>
-        <button onClick={() => moveText('right')} style={{marginTop:'10px', marginRight:'10px'}}>➡ Move Right</button>
-      
-      <button onClick={undo} disabled={history.length === 0}>↩ Undo</button>
-      <button onClick={redo} disabled={redoStack.length === 0} style={{ margin: '0 10px' }}>↪ Redo</button>
-      <button onClick={() => setIsPlaying(!isPlaying)}>{isPlaying ? 'Pause Video' : 'Play Video'}</button>
-      <button onClick={handleStop} style={{ marginLeft: '10px' }}>Stop Video</button>
-        </div>
+        <button onClick={() => moveText('up')}>⬆ Up</button>
+        <button onClick={() => moveText('down')}>⬇ Down</button>
+        <button onClick={() => moveText('left')}>⬅ Left</button>
+        <button onClick={() => moveText('right')}>➡ Right</button>
+        <button onClick={undo} disabled={!history.length}>↩ Undo</button>
+        <button onClick={redo} disabled={!redoStack.length}>↪ Redo</button>
+        <button onClick={() => setIsPlaying(!isPlaying)}>
+          {isPlaying ? 'Pause Video' : 'Play Video'}
+        </button>
+        <button onClick={handleStop}>Stop Video</button>
+        <button onClick={handleSaveCanvas}>💾 Save</button>
+        <button onClick={handleLoadCanvas}>📂 Load</button>
+      </div>
 
       <Stage width={window.innerWidth} height={600}>
         <Layer ref={layerRef}>
-          <URLImage src={demoImage} showTransformer={showTransformer} onTransformSave={saveToHistory} />
+          <URLImage
+            src={demoImage}
+            showTransformer={showTransformer}
+            onTransformSave={saveToHistory}
+            imageProps={imageProps}
+            setImageProps={setImageProps}
+          />
           {canvasText && (
             <ResizableText
               text={canvasText}
@@ -242,11 +256,11 @@ const Canvas = () => {
           <KonvaImage
             ref={konvaVideoRef}
             image={videoRef.current}
-            x={100}
-            y={300}
-            width={480}
-            height={270}
+            {...videoProps}
             draggable
+            onDragEnd={(e) =>
+              setVideoProps((prev) => ({ ...prev, x: e.target.x(), y: e.target.y() }))
+            }
           />
         </Layer>
       </Stage>
